@@ -13,6 +13,15 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// Take a yaml of the following format
+// countrycode:
+// - mirror1
+// - mirror2
+// default:
+// - fallback1
+// - fallback2
+// And use it to redirect people when hitting our port
+
 func main() {
 
 	configFile := os.Getenv("CONFIG")
@@ -28,7 +37,9 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("Unmarshal err   #%v ", err))
 	}
+
 	m := macaron.Classic()
+
 	m.Get("/", func(ctx *macaron.Context, req *http.Request, w http.ResponseWriter) {
 		remoteIP := ctx.RemoteAddr()
 		geo, err := geoip.New()
@@ -37,23 +48,26 @@ func main() {
 			return
 		}
 		country := geo.Lookup(net.ParseIP(remoteIP))
-		mirrors, ok := config[country.Short]
-		if ok {
+
+		if mirrors, ok := config[country.Short]; ok {
 			randomIndex := rand.Intn(len(mirrors))
 			pick := mirrors[randomIndex]
+			fmt.Println("Redirecting", remoteIP, country, "to", pick)
 			ctx.Redirect(pick, 301)
 			return
-		} else {
-			mirrors, ok := config["default"]
-			if len(mirrors) == 0 || !ok {
-				ctx.HTML(200, "Warning", "No mirrors configured in the 'default' key")
-				return
-			}
-			randomIndex := rand.Intn(len(mirrors))
-			pick := mirrors[randomIndex]
-			ctx.Redirect(pick, 301)
 		}
-		fmt.Printf("%s\n", country.Short)
+
+		mirrors, ok := config["default"]
+		if len(mirrors) == 0 || !ok {
+			ctx.HTML(200, "Warning", "No mirrors configured in the 'default' key")
+			return
+		}
+
+		randomIndex := rand.Intn(len(mirrors))
+		pick := mirrors[randomIndex]
+		fmt.Println("Redirecting", remoteIP, country, "to", pick)
+		ctx.Redirect(pick, 301)
+
 	})
 	m.Run()
 }
