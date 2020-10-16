@@ -6,7 +6,9 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
 
 	"github.com/alecthomas/geoip"
 	"gopkg.in/macaron.v1"
@@ -28,7 +30,8 @@ func main() {
 	if len(configFile) == 0 {
 		configFile = "config.yaml"
 	}
-	config := map[string][]string{}
+	var config = map[string][]string{}
+
 	yamlFile, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		panic(fmt.Sprintf("yamlFile.Get err   #%v ", err))
@@ -38,9 +41,26 @@ func main() {
 		panic(fmt.Sprintf("Unmarshal err   #%v ", err))
 	}
 
-	m := macaron.Classic()
+	countryToMirror := func(urlpath string, mirrors []string) string {
+		// select a random mirror
+		randomIndex := rand.Intn(len(mirrors))
+		pick := mirrors[randomIndex]
 
-	m.Get("/", func(ctx *macaron.Context, req *http.Request, w http.ResponseWriter) {
+		// Join the original path requested with the mirror, so we redirect to the specific page
+		u, err := url.Parse(pick)
+		if err != nil {
+			panic(err)
+		}
+		u.Path = path.Join(u.Path, urlpath)
+		pick = u.String()
+		return pick
+	}
+
+	m := macaron.Classic()
+	m.Use(macaron.Renderer())
+	m.Get("/*", func(ctx *macaron.Context, req *http.Request, w http.ResponseWriter) {
+		urlpath := req.URL.Path
+
 		remoteIP := ctx.RemoteAddr()
 		geo, err := geoip.New()
 		if err != nil {
@@ -48,26 +68,27 @@ func main() {
 			return
 		}
 		country := geo.Lookup(net.ParseIP(remoteIP))
+		if country != nil {
+			if mirrors, ok := config[country.Short]; ok {
+				pick := countryToMirror(urlpath, mirrors)
 
-		if mirrors, ok := config[country.Short]; ok {
-			randomIndex := rand.Intn(len(mirrors))
-			pick := mirrors[randomIndex]
-			fmt.Println("Redirecting", remoteIP, country, "to", pick)
-			ctx.Redirect(pick, 301)
-			return
+				fmt.Println("Redirecting", remoteIP, country, "to", pick)
+				ctx.Redirect(pick, 301)
+				return
+			}
 		}
 
 		mirrors, ok := config["default"]
 		if len(mirrors) == 0 || !ok {
-			ctx.HTML(200, "Warning", "No mirrors configured in the 'default' key")
+			ctx.PlainText(200, []byte("No mirrors configured in the 'default' key"))
 			return
 		}
 
-		randomIndex := rand.Intn(len(mirrors))
-		pick := mirrors[randomIndex]
+		pick := countryToMirror(urlpath, mirrors)
 		fmt.Println("Redirecting", remoteIP, country, "to", pick)
-		ctx.Redirect(pick, 301)
 
+		ctx.Redirect(pick, 301)
 	})
+
 	m.Run()
 }
