@@ -41,7 +41,7 @@ func main() {
 		panic(fmt.Sprintf("Unmarshal err   #%v ", err))
 	}
 
-	countryToMirror := func(urlpath string, mirrors []string) string {
+	selectMirror := func(urlpath string, mirrors []string) string {
 		// select a random mirror
 		randomIndex := rand.Intn(len(mirrors))
 		pick := mirrors[randomIndex]
@@ -70,7 +70,7 @@ func main() {
 		country := geo.Lookup(net.ParseIP(remoteIP))
 		if country != nil {
 			if mirrors, ok := config[country.Short]; ok {
-				pick := countryToMirror(urlpath, mirrors)
+				pick := selectMirror(urlpath, mirrors)
 
 				fmt.Println("Redirecting", remoteIP, country, "to", pick)
 				ctx.Redirect(pick, 301)
@@ -84,7 +84,7 @@ func main() {
 			return
 		}
 
-		pick := countryToMirror(urlpath, mirrors)
+		pick := selectMirror(urlpath, mirrors)
 		fmt.Println("Redirecting", remoteIP, country, "to", pick)
 
 		ctx.Redirect(pick, 301)
