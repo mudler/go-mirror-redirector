@@ -19,3 +19,5 @@ default:
 ```
 
 you can pass by a config path with `CONFIG` environment variable. You can customize a listening address with `HOST`, the port with `PORT`, and the deployment mode (prod, dev) with `MACARON_ENV`.
+
+There is also a deployment example for Kubernetes in `kube.yaml`.
