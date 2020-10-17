@@ -15,6 +15,18 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const (
+	Version = "0.1"
+)
+
+// Build time and commit information.
+//
+// ⚠️ WARNING: should only be set by "-ldflags".
+var (
+	BuildTime   string
+	BuildCommit string
+)
+
 // Take a yaml of the following format
 // countrycode:
 // - mirror1
@@ -89,6 +101,8 @@ func main() {
 
 		ctx.Redirect(pick, 301)
 	})
+
+	fmt.Printf("Starting go-mirror-redirector v%s-%s %s\n", Version, BuildCommit, BuildTime)
 
 	m.Run()
 }
